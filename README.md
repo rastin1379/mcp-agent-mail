@@ -17,7 +17,7 @@ The idea comes from [Dicklesworthstone/mcp_agent_mail](https://github.com/Dickle
 1. A teammate calls `ask` (or `send`) with a message for another teammate.
 2. If the recipient is Claude or ChatGPT, the runner sees the message within seconds. It starts a headless Claude Code or Codex session on your Mac with the conversation so far, and that session replies with `send`.
 3. `ask` waits up to ~45 seconds, so quick answers come back in the same turn. Slower answers stay in the conversation: chat apps pick them up with `wait_for_reply` or `check_inbox`, and a runner session that asked is woken up again in **the same session** when the answer lands.
-4. Muse checks its mail on a schedule you set inside Muse, because nothing outside Meta can wake it up.
+4. Muse checks its mail on a schedule you set inside Muse (every 5 minutes works), because nothing outside Meta can wake it up.
 
 ## Tools every teammate gets
 
@@ -29,6 +29,14 @@ The idea comes from [Dicklesworthstone/mcp_agent_mail](https://github.com/Dickle
 | `check_inbox` | New mail for you, marked read |
 | `wait_for_reply` | Waits on one conversation |
 | `read_thread` | The full history of a conversation |
+
+## Teaching each app when to use it
+
+Having the tools isn't enough: an app that doesn't know Muse has your Gmail, or that Claude has your files, answers on its own instead of asking. Three places carry the same short note on who has what and when to ask whom:
+
+- **The server** hands it to every app when it connects, Muse included.
+- **[`skills/agent-mail`](skills/agent-mail/SKILL.md)** is a skill for Claude Code and Codex. `node scripts/setup.js install-skills` copies it to `~/.claude/skills` and `~/.codex/skills`. Run it again after editing the skill.
+- **Muse** gets it as a standing rule you paste once (below).
 
 Apps that can set headers send their token in `X-Agent-Mail-Token` (Google's front end rejects `Authorization` headers that aren't Google logins). Apps that can't set headers put it in the URL: `/mcp/<token>`.
 
@@ -54,6 +62,7 @@ npx firebase-tools deploy --only functions:agentmail,firestore --project <your-p
 node scripts/setup.js server https://<the function's run.app URL>   # OAuth metadata needs the root address
 node scripts/setup.js connect-claude  # Claude Code sessions on this Mac get the tools
 node scripts/setup.js connect-info    # writes the ChatGPT and Muse links to ~/.config/agent-mail/CONNECT.md
+node scripts/setup.js install-skills  # Claude Code and Codex learn when to use Agent Mail
 node scripts/setup.js install-runner  # starts the runner now and at every login
 ```
 
@@ -65,11 +74,15 @@ Then connect the two cloud apps with the links in `CONNECT.md`. Each app can con
 Where to add them:
 
 - **ChatGPT** (Plus or higher, on the web): chatgpt.com/plugins → **+** → Add custom MCP server, Public endpoint, authentication None. Then type `@Agent Mail` in a chat.
-- **Muse**: Settings → Connectors → Add custom connector (or ask Muse in chat to create one), then paste the text below into Muse.
+- **Muse**: Settings → Connectors → Add custom connector (or ask Muse in chat to create one), then paste the two texts below into Muse.
 
 ### Muse mail check (paste into Muse)
 
 > Set up a recurring check, as often as you're allowed: call Agent Mail's `check_inbox`. For each message, do what it asks and answer with `send` (same `thread_id`, to the sender). Skip messages that don't need an answer, and never send thank-yous. Anything that would post, message people, email or buy still needs my tap as usual. If there's no mail, do nothing and don't report.
+
+### Muse standing rule (paste once)
+
+> Please save this as a standing rule for all our chats. You're on Agent Mail with Claude and ChatGPT. Both run on my Mac and can read my work files (~/Work); you can't. So whenever I ask about something on my Mac or in my files, or want work done there, ask Claude (or ChatGPT) with Agent Mail's ask tool instead of saying you can't reach it. Make the message self-contained, since they can't see our chat. If the answer isn't back when ask returns, tell me it's on the way and pick it up on your next mail check. Tell me who you asked and what they said. Never put passwords or payment details in a message, and anything that would post, email, message people or buy still needs my tap.
 
 ## Settings
 

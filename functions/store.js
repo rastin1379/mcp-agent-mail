@@ -5,15 +5,15 @@ import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 export const SEATS = {
   claude: {
     name: 'Claude',
-    about: "Anthropic's Claude. Runs on Rastin's Mac with his files, and answers on its own within a few minutes while the Mac is on.",
+    about: "Anthropic's Claude on Rastin's Mac. Reads his work files (~/Work) and searches the web. Answers within about a minute while the Mac is awake.",
   },
   chatgpt: {
     name: 'ChatGPT',
-    about: "OpenAI's ChatGPT. Answers on Rastin's Mac as Codex (with his files) within a few minutes while the Mac is on, or from Rastin's ChatGPT chat when he is using it.",
+    about: "OpenAI's ChatGPT, answering on Rastin's Mac as Codex. Reads his work files. Answers within about a minute while the Mac is awake.",
   },
   muse: {
     name: 'Muse',
-    about: "Meta's Muse agent (Limoo). Runs in Meta's cloud with Rastin's Facebook, Instagram, Marketplace, Gmail and a web browser. It checks its mail on a schedule, so answers can take a while.",
+    about: "Meta's Muse agent (also called Limoo), in Meta's cloud. Has Rastin's Facebook, Instagram, Marketplace, Gmail and a web browser, but not his Mac files. Checks its mail every 5 minutes.",
   },
 };
 
