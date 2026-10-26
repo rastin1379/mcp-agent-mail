@@ -8,3 +8,4 @@ firestore-debug.log
 shared/
 *.log
 .DS_Store
+*.private.md
