@@ -53,6 +53,10 @@ function server(url) {
   const c = load();
   c.server = url.replace(/\/+$/, '');
   save(c);
+  // The OAuth metadata must name the public address, so the function needs it too.
+  const env = join(ROOT, 'functions', '.env');
+  const lines = readFileSync(env, 'utf8').split('\n').filter((l) => l && !l.startsWith('PUBLIC_URL='));
+  writeFileSync(env, [...lines, `PUBLIC_URL=${c.server}`, ''].join('\n'));
   console.log('Server saved:', c.server);
 }
 
@@ -68,25 +72,33 @@ function connectClaude() {
 function connectInfo() {
   const c = load();
   const file = join(HOME, 'CONNECT.md');
-  writeFileSync(file, `# Agent Mail connector links (private: anyone with a link can post as that app)
+  writeFileSync(file, `# Agent Mail: connect ChatGPT and Muse (private: these keys let an app act as that teammate)
 
-## ChatGPT (chatgpt.com on the web, Plus plan)
-1. Settings → **Apps** (older menus say Connectors) → Advanced settings → turn on **Developer mode**.
-2. Back in Apps, click **Create app** (or Create).
-3. Name: Agent Mail. MCP server URL:
-   ${c.server}/mcp/${c.tokens['chatgpt-web']}
-4. Authentication: **No authentication**. Tick the box that says you trust the app, then Create.
-5. In a chat, open the **+** menu → More → Developer mode, and switch on Agent Mail.
-   ChatGPT asks you to confirm each message it sends; reading mail needs no confirmation.
+## ChatGPT (chatgpt.com in a browser)
+1. Open https://chatgpt.com/plugins and click **+** → **Add custom MCP server**.
+   (No Plugins page? Use Settings → Apps → Advanced settings → Developer mode, then **Create app**.)
+2. Name: Agent Mail. Connection: **Public endpoint**. URL:
+   ${c.server}/${c.tokens['chatgpt-web']}/mcp
+3. Authentication: **None**. Tick "I understand and want to continue", then **Create as a plugin** and install it.
+   If it only offers OAuth, use the URL ${c.server}/mcp and paste this key on the sign-in page:
+   ${c.tokens['chatgpt-web']}
+4. In a new chat type **@Agent Mail** and ask, for example:
+   "@Agent Mail ask Claude what the newest file in ~/Work/Agents/Trends/daily-x is."
 
 ## Muse (muse.ai)
-Add a custom connector (MCP server):
-   ${c.server}/mcp/${c.tokens.muse}
-No sign-in needed. Then paste the "Muse mail check" text from the README into Muse to set up its schedule.
+1. Settings → **Connectors** → **Add custom connector**. URL:
+   ${c.server}/mcp
+   (No such button? Send Muse: "Create a custom connector. Name: Agent Mail. Transport: remote streamable HTTP. URL: ${c.server}/mcp. Auth: OAuth.")
+2. Muse opens an Agent Mail sign-in page. Paste this key and click Connect:
+   ${c.tokens.muse}
+   (If Muse never shows a sign-in page, use this URL instead, which needs no sign-in: ${c.server}/${c.tokens.muse}/mcp)
+3. Then send Muse the mail-check text below so it checks its mail on a schedule.
 
-## Claude.ai on the web or in Claude.app (optional)
-Settings → Connectors → Add custom connector:
-   ${c.server}/mcp/${c.tokens['claude-web']}
+### Muse mail check
+Set up a recurring check, as often as you're allowed: call Agent Mail's check_inbox. For each message, do what it asks and answer with send (same thread_id, to the sender). Skip messages that don't need an answer, and never send thank-yous. Anything that would post, message people, email or buy still needs my tap as usual. If there's no mail, do nothing and don't report.
+
+## Claude.ai / Claude.app chat (optional)
+Settings → Connectors → Add custom connector: ${c.server}/${c.tokens['claude-web']}/mcp
 `);
   chmodSync(file, 0o600);
   console.log('Wrote', file);

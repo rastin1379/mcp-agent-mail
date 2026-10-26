@@ -7,6 +7,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as store from './store.js';
+import * as oauth from './oauth.js';
 
 initializeApp();
 
@@ -145,15 +146,38 @@ function buildServer(seat, run, via) {
 
 export const app = express();
 app.disable('x-powered-by');
-app.use((req, res, next) => (req.body === undefined ? express.json({ limit: '1mb' })(req, res, next) : next()));
+const parseJson = express.json({ limit: '1mb' });
+const parseForm = express.urlencoded({ extended: false });
+app.use((req, res, next) => (req.body === undefined ? parseJson(req, res, () => parseForm(req, res, next)) : next()));
+
+// One log line per request, with tokens replaced by the app they belong to.
+const mask = (path) => path.replace(/am_[A-Za-z0-9_-]+/g, (t) => `<${store.seatForToken(t)?.label || 'bad-token'}>`);
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const rpc = Array.isArray(body) ? body.map((b) => b.method).join(',') : body.method;
+    console.log(JSON.stringify({
+      req: `${req.method} ${mask(req.path)}`,
+      status: res.statusCode,
+      ua: (req.get('user-agent') || '').slice(0, 80),
+      rpc,
+      tool: body.params?.name,
+      auth: req.params?.token || req.path.includes('/am_') ? 'path' : req.get('x-agent-mail-token') ? 'header' : req.get('authorization') ? 'bearer' : 'none',
+      ms: Date.now() - start,
+    }));
+  });
+  next();
+});
 
 // Google's front end rejects Authorization headers that aren't Google tokens, so ours travels in
 // X-Agent-Mail-Token (or in the URL path for apps that can't set headers).
 const headerToken = (req) => req.get('x-agent-mail-token') || (req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
 
 async function mcp(req, res) {
-  const who = store.seatForToken(req.params.token || headerToken(req));
-  if (!who) return res.status(401).json({ error: 'Unknown or missing token.' });
+  const token = req.params.token || headerToken(req);
+  const who = store.seatForToken(token) || (await oauth.seatForAccessToken(token));
+  if (!who) return oauth.challenge(req, res);
   if (req.method !== 'POST') {
     return res.status(405).set('Allow', 'POST').json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed.' }, id: null });
   }
@@ -174,8 +198,10 @@ async function mcp(req, res) {
   }
 }
 
+app.use(oauth.router);
 app.all('/mcp', mcp);
 app.all('/mcp/:token', mcp);
+app.all('/:token/mcp', mcp);
 
 // Runner API: only the runner on Rastin's Mac uses these, with the local seats' tokens.
 const api = express.Router();
@@ -209,7 +235,7 @@ api.post('/send', handle((req) => {
 }));
 app.use('/api', api);
 
-app.get('/', (req, res) => res.type('text').send('Agent Mail is running. Connect an MCP client to /mcp/<your token>.'));
+app.get('/', (req, res) => res.type('text').send('Agent Mail is running. Connect an MCP client to /<your token>/mcp, or to /mcp with OAuth.'));
 
 export const agentmail = onRequest(
   { region: 'us-central1', timeoutSeconds: 120, memory: '256MiB', maxInstances: 5, invoker: 'public' },

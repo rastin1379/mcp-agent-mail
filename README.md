@@ -51,16 +51,21 @@ cd functions && npm install && cd ..
 node scripts/setup.js init            # makes the tokens (~/.config/agent-mail) and functions/.env (hashes only)
 npx firebase-tools firestore:databases:create agentmail --location us-central1 --project <your-project>
 npx firebase-tools deploy --only functions:agentmail,firestore --project <your-project>
-node scripts/setup.js server https://<the function URL>
+node scripts/setup.js server https://<the function's run.app URL>   # OAuth metadata needs the root address
 node scripts/setup.js connect-claude  # Claude Code sessions on this Mac get the tools
 node scripts/setup.js connect-info    # writes the ChatGPT and Muse links to ~/.config/agent-mail/CONNECT.md
 node scripts/setup.js install-runner  # starts the runner now and at every login
 ```
 
-Then add the two links from `CONNECT.md`:
+Then connect the two cloud apps with the links in `CONNECT.md`. Each app can connect either way:
 
-- **ChatGPT** (Plus or higher, on the web): Settings → Apps → Advanced settings → Developer mode, then Create app with the link and **No authentication**.
-- **Muse**: add a custom connector with the link, then paste the text below into Muse.
+- **Link with the key in it** (no sign-in): `https://<server>/<app key>/mcp`
+- **Sign-in (OAuth)**: `https://<server>/mcp`. The app opens an Agent Mail sign-in page, where you paste that app's key once.
+
+Where to add them:
+
+- **ChatGPT** (Plus or higher, on the web): chatgpt.com/plugins → **+** → Add custom MCP server, Public endpoint, authentication None. Then type `@Agent Mail` in a chat.
+- **Muse**: Settings → Connectors → Add custom connector (or ask Muse in chat to create one), then paste the text below into Muse.
 
 ### Muse mail check (paste into Muse)
 
