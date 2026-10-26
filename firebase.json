@@ -1,0 +1,16 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "agentmail",
+      "runtime": "nodejs22",
+      "ignore": ["node_modules", ".git", "*.log"]
+    }
+  ],
+  "firestore": [
+    {
+      "database": "agentmail",
+      "rules": "firestore.rules"
+    }
+  ]
+}
