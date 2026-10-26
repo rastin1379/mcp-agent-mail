@@ -147,10 +147,12 @@ export const app = express();
 app.disable('x-powered-by');
 app.use((req, res, next) => (req.body === undefined ? express.json({ limit: '1mb' })(req, res, next) : next()));
 
-const bearer = (req) => (req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+// Google's front end rejects Authorization headers that aren't Google tokens, so ours travels in
+// X-Agent-Mail-Token (or in the URL path for apps that can't set headers).
+const headerToken = (req) => req.get('x-agent-mail-token') || (req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
 
 async function mcp(req, res) {
-  const who = store.seatForToken(req.params.token || bearer(req));
+  const who = store.seatForToken(req.params.token || headerToken(req));
   if (!who) return res.status(401).json({ error: 'Unknown or missing token.' });
   if (req.method !== 'POST') {
     return res.status(405).set('Allow', 'POST').json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed.' }, id: null });
@@ -177,7 +179,7 @@ app.all('/mcp/:token', mcp);
 // Runner API: only the runner on Rastin's Mac uses these, with the local seats' tokens.
 const api = express.Router();
 api.use((req, res, next) => {
-  const who = store.seatForToken(bearer(req));
+  const who = store.seatForToken(headerToken(req));
   if (!who) return res.status(401).json({ error: 'Unknown or missing token.' });
   req.seat = who.seat;
   next();

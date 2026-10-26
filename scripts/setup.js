@@ -62,7 +62,7 @@ function connectClaude() {
     execFileSync('claude', ['mcp', 'remove', '--scope', 'user', 'agentmail'], { stdio: 'ignore' });
   } catch {}
   execFileSync('claude', ['mcp', 'add', '--scope', 'user', '--transport', 'http', 'agentmail', `${c.server}/mcp`,
-    '--header', `Authorization: Bearer ${c.tokens['claude-local']}`], { stdio: 'inherit' });
+    '--header', `X-Agent-Mail-Token: ${c.tokens['claude-local']}`], { stdio: 'inherit' });
 }
 
 function connectInfo() {
@@ -71,12 +71,13 @@ function connectInfo() {
   writeFileSync(file, `# Agent Mail connector links (private: anyone with a link can post as that app)
 
 ## ChatGPT (chatgpt.com on the web, Plus plan)
-1. Settings → Apps & Connectors → Advanced settings → turn on **Developer mode**.
-2. Settings → Apps & Connectors → **Create**.
+1. Settings → **Apps** (older menus say Connectors) → Advanced settings → turn on **Developer mode**.
+2. Back in Apps, click **Create app** (or Create).
 3. Name: Agent Mail. MCP server URL:
    ${c.server}/mcp/${c.tokens['chatgpt-web']}
-4. Authentication: **No authentication**. Tick "I trust this application", then Create.
-5. In a chat, open the + menu → Developer mode → turn on Agent Mail.
+4. Authentication: **No authentication**. Tick the box that says you trust the app, then Create.
+5. In a chat, open the **+** menu → More → Developer mode, and switch on Agent Mail.
+   ChatGPT asks you to confirm each message it sends; reading mail needs no confirmation.
 
 ## Muse (muse.ai)
 Add a custom connector (MCP server):

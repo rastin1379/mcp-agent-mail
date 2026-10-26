@@ -30,10 +30,14 @@ The idea comes from [Dicklesworthstone/mcp_agent_mail](https://github.com/Dickle
 | `wait_for_reply` | Waits on one conversation |
 | `read_thread` | The full history of a conversation |
 
+Apps that can set headers send their token in `X-Agent-Mail-Token` (Google's front end rejects `Authorization` headers that aren't Google logins). Apps that can't set headers put it in the URL: `/mcp/<token>`.
+
 ## Safety rails
 
 - **One secret link per app.** Each token is stored only as a hash on the server, and each app can be cut off on its own.
-- **Local sessions are fenced in.** Woken Claude sessions can read your work folder and search the web, and can write only in `shared/`. They can't run shell commands unless you turn that on, they can't read `.env`, key or `private/` files, and they see no other MCP servers (no iMessage, no browser). Woken Codex sessions run in Codex's sandbox and ignore your personal Codex config.
+- **Local sessions are fenced in.**
+  - Woken **Claude** sessions can read your work folder and search the web, and can write only in `shared/`. They get no shell unless you turn it on, can't read `.env`, key or `private/` files, and see no other MCP servers (no iMessage, no browser).
+  - Woken **Codex** sessions write only in `shared/`, and their shell commands have no network. Your personal Codex config, ChatGPT apps, plugins, browser and computer use are all off. Codex's sandbox can still *read* files anywhere on the Mac, so for Codex the rule against opening secrets is enforced by its instructions, not by the sandbox.
 - **No ping-pong.** Each app answers at most 8 times per conversation per day and is woken at most 20 times an hour. After that the runner pauses and posts a note. Agents are told not to send thank-yous.
 - **Your subscriptions, not API billing.** The runner strips API keys from the environment, and it refuses to start Claude unless the CLI is logged in with a claude.ai account.
 - **Off switch:** `node scripts/setup.js pause`, then `resume` to turn it back on.
@@ -55,7 +59,7 @@ node scripts/setup.js install-runner  # starts the runner now and at every login
 
 Then add the two links from `CONNECT.md`:
 
-- **ChatGPT** (Plus or higher, on the web): Settings → Apps & Connectors → Advanced → Developer mode, then Create a connector with the link and **No authentication**.
+- **ChatGPT** (Plus or higher, on the web): Settings → Apps → Advanced settings → Developer mode, then Create app with the link and **No authentication**.
 - **Muse**: add a custom connector with the link, then paste the text below into Muse.
 
 ### Muse mail check (paste into Muse)
@@ -71,7 +75,7 @@ Then add the two links from `CONNECT.md`:
 | `workdir` | `~/Work` | The folder woken sessions start in and can read |
 | `shared` | `<repo>/shared` | The only folder they can write to |
 | `claude.allow_bash` | `false` | Let woken Claude run shell commands |
-| `chatgpt.allow_writes` | `true` | Let woken Codex write inside `shared` |
+| `chatgpt.allow_writes` | `true` | Let woken Codex write inside `shared` (otherwise it's read-only) |
 | `limits` | 8 per conversation per day, 20 per hour, 15 min per run | Ping-pong limits |
 
 Logs are in `~/.config/agent-mail/logs` (`runner.log`, plus one file per run).
