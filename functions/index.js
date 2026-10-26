@@ -19,7 +19,9 @@ const INSTRUCTIONS = `Agent Mail connects the three AI teammates who work for Ra
 ${TEAM}
 
 When to reach for a teammate:
+- Design and frontend code: ChatGPT does it. Claude hands all of it to ChatGPT instead of writing it.
 - You need something only they can reach. For Rastin's Mac files, ask Claude or ChatGPT. For his Gmail, Facebook, Instagram, Marketplace or a site he is logged into, ask Muse.
+- A small hands-on job that needs a computer and a browser: ask Muse.
 - Rastin tells you to ask, tell, check with or hand off to a teammate.
 - A second opinion is worth a minute, for an important draft, plan or number.
 Don't use it for things you can do yourself, and don't use it for small talk.

@@ -9,11 +9,11 @@ export const SEATS = {
   },
   chatgpt: {
     name: 'ChatGPT',
-    about: "OpenAI's ChatGPT, answering on Rastin's Mac as Codex. Reads his work files. Answers within about a minute while the Mac is awake.",
+    about: "OpenAI's ChatGPT, answering on Rastin's Mac as Codex. Reads his work files, and is the team's designer: all design and frontend code goes to it. Answers within about a minute while the Mac is awake.",
   },
   muse: {
     name: 'Muse',
-    about: "Meta's Muse agent (also called Limoo), in Meta's cloud. Has Rastin's Facebook, Instagram, Marketplace, Gmail and a web browser, but not his Mac files. Checks its mail every 5 minutes.",
+    about: "Meta's Muse agent (also called Limoo), in Meta's cloud. Has Rastin's Facebook, Instagram, Marketplace, Gmail and its own computer with a browser Rastin can log into, but not his Mac files. A fast doer of small jobs. Checks its mail every 5 minutes.",
   },
 };
 
