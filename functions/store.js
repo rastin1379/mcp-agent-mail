@@ -71,7 +71,7 @@ async function rateLimit(seat) {
 }
 
 // run = the runner's id for a headless session, so replies can wake that same session later.
-export async function send({ from, to, text, threadId, expectsReply, run, kind = 'message' }) {
+export async function send({ from, to, text, threadId, expectsReply, run, via = null, kind = 'message' }) {
   checkSeat(to, from);
   text = String(text || '').trim();
   if (!text) throw new Error('The message is empty.');
@@ -111,6 +111,7 @@ export async function send({ from, to, text, threadId, expectsReply, run, kind =
     expects_reply: !!expectsReply,
     kind,
     run: run || null,
+    via,
     status: 'new',
     created_at: FieldValue.serverTimestamp(),
   });
@@ -129,6 +130,11 @@ async function markRead(docs, status = 'read') {
   const batch = fs().batch();
   for (const d of docs) batch.update(d.ref, { status, read_at: FieldValue.serverTimestamp() });
   await batch.commit();
+}
+
+// Which app last reached the server for a seat (e.g. chatgpt-web vs chatgpt-local).
+export async function seen(seat, label) {
+  await fs().collection('seats').doc(seat).set({ seen: { [label]: FieldValue.serverTimestamp() } }, { merge: true });
 }
 
 export async function touch(seat, field) {
@@ -177,7 +183,7 @@ export async function readThread(seat, threadId, { limit = 50 } = {}) {
   const msgs = snap.docs
     .sort((a, b) => a.data().created_at?.toMillis() - b.data().created_at?.toMillis())
     .slice(-limit)
-    .map((d) => ({ ...view(d), run: d.data().run || null }));
+    .map((d) => ({ ...view(d), run: d.data().run || null, via: d.data().via || null }));
   return {
     thread_id: threadId,
     subject: th.subject,
@@ -200,7 +206,8 @@ export async function whoIsHere() {
     if (runner && now - runner < 3 * 60 * 1000) status = 'on call: answers automatically within a few minutes';
     else if (seat === 'muse') status = checked ? `checks mail on a schedule; last checked ${iso(st.checked_at)}` : 'has not checked mail yet';
     else status = "offline: Rastin's Mac is off or asleep. Mail waits until it is back";
-    return { id: seat, name: s.name, about: s.about, status };
+    const apps = Object.fromEntries(Object.entries(st.seen || {}).map(([label, t]) => [label, iso(t)]));
+    return { id: seat, name: s.name, about: s.about, status, apps_last_seen: apps };
   });
 }
 

@@ -29,7 +29,7 @@ const text = (value) => ({ content: [{ type: 'text', text: typeof value === 'str
 const failed = (err) => ({ isError: true, content: [{ type: 'text', text: err.message || String(err) }] });
 const seatId = z.enum(Object.keys(store.SEATS));
 
-function buildServer(seat, run) {
+function buildServer(seat, run, via) {
   const me = store.SEATS[seat].name;
   const server = new McpServer({ name: 'agent-mail', version: '1.0.0' }, { instructions: `You are ${me} (id "${seat}").\n\n${INSTRUCTIONS}` });
   const safely = (fn) => async (args) => {
@@ -71,7 +71,7 @@ function buildServer(seat, run) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     safely(async ({ to, message, thread_id, wait_seconds }) => {
-      const sent = await store.send({ from: seat, to, text: message, threadId: thread_id, expectsReply: true, run });
+      const sent = await store.send({ from: seat, to, text: message, threadId: thread_id, expectsReply: true, run, via });
       const replies = await store.waitForReply(seat, sent.thread_id, { seconds: wait_seconds ?? 45, interactive: !run });
       if (replies.length) return text({ thread_id: sent.thread_id, replies });
       return text({ thread_id: sent.thread_id, replies: [], note: await noAnswer(to, sent.thread_id) });
@@ -92,7 +92,7 @@ function buildServer(seat, run) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     safely(async ({ to, message, thread_id, expects_reply }) => {
-      const sent = await store.send({ from: seat, to, text: message, threadId: thread_id, expectsReply: !!expects_reply, run });
+      const sent = await store.send({ from: seat, to, text: message, threadId: thread_id, expectsReply: !!expects_reply, run, via });
       if (expects_reply && !run) await store.holdThread(seat, sent.thread_id);
       return text({ ...sent, delivered: true });
     }),
@@ -158,7 +158,8 @@ async function mcp(req, res) {
     return res.status(405).set('Allow', 'POST').json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed.' }, id: null });
   }
   const run = req.get('x-agent-mail-run') || null;
-  const server = buildServer(who.seat, run);
+  await store.seen(who.seat, who.label);
+  const server = buildServer(who.seat, run, who.label);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => {
     transport.close();
@@ -202,6 +203,7 @@ api.post('/send', handle((req) => {
     threadId: thread_id,
     expectsReply: !!expects_reply,
     run: req.get('x-agent-mail-run') || null,
+    via: 'runner',
     kind: kind === 'system' ? 'system' : 'message',
   });
 }));
