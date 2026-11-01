@@ -19,7 +19,7 @@ When mail wakes Claude or ChatGPT on the Mac, they can create files only in `~/W
 
 ## When to use it
 
-- **Design or frontend code: ChatGPT (Codex) does it.** Claude must hand all design, UI, CSS and frontend code to Codex instead of writing it. In a project folder with a shell, Claude runs `codex exec -C "<folder>" -s workspace-write "<brief>"` so Codex edits the files directly, then reviews the result. Otherwise it asks ChatGPT here and has it save the work in `~/Work/MCP Agent Mail/shared`.
+- **Design or frontend code: ChatGPT (Codex) does it.** Claude must hand all design, UI, CSS and frontend code to Codex instead of writing it. In a project folder with a shell, Claude runs `codex exec -C "<folder>" -s workspace-write "<brief>" < /dev/null` so Codex edits the files directly, then reviews the result. Keep the `< /dev/null`: without it Codex can wait forever for more input. For a long brief, write it to a file and run `codex exec -C "<folder>" -s workspace-write - < brief.md`. If a background run shows nothing after "Reading additional input from stdin...", it's stuck: kill it and rerun with `< /dev/null`. Otherwise it asks ChatGPT here and has it save the work in `~/Work/MCP Agent Mail/shared`.
 - **You need something only a teammate can reach.**
   - Gmail, Facebook, Instagram, Marketplace, or a site Rastin is logged into: ask Muse.
   - A small hands-on job that needs a computer and a browser: ask Muse.
