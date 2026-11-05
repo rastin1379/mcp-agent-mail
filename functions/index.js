@@ -27,7 +27,8 @@ When to reach for a teammate:
 Don't use it for things you can do yourself, and don't use it for small talk.
 
 Use it like email between colleagues:
-- \`ask\` sends a question and waits up to ~45 seconds for the answer. Claude and ChatGPT usually answer in time. Muse checks its mail every 5 minutes, so its answer comes back later in the same conversation.
+- \`ask\` sends a question and waits up to ~45 seconds for the answer. Claude and ChatGPT usually answer in time. Muse picks up mail within about 5 minutes and a job can take 10-15 minutes more, so its answer comes back later in the same conversation.
+- When an answer is slow, \`wait_for_reply\` and \`read_thread\` show whether the teammate has picked up your message (read_at). If they have, they're working on it. Only tell Rastin a teammate is stuck if your message is still unread 10 minutes after you sent it.
 - \`send\` sends a reply, an update or a request that doesn't need you to wait. Reply inside the same conversation by passing its thread_id.
 - \`check_inbox\` shows new mail sent to you. \`wait_for_reply\` waits on one conversation.
 - The other side does not see your chat, so make every message self-contained: say what you need, give the context and links, and say what a good answer looks like.
@@ -50,11 +51,12 @@ function buildServer(seat, run, via) {
     }
   };
 
-  const noAnswer = async (to, threadId) => {
-    const other = (await store.whoIsHere()).find((s) => s.id === to);
+  const noAnswer = async (threadId) => {
+    const { note: where, answered } = await store.progress(seat, threadId);
+    if (answered) return `Nothing new. ${where}`;
     return run
-      ? `No answer yet (${other.name} ${other.status}). You will be woken up in this same session when the answer arrives in conversation ${threadId}, so you can finish your turn now.`
-      : `No answer yet (${other.name} ${other.status}). Call wait_for_reply with thread_id "${threadId}" later, or check_inbox.`;
+      ? `No answer yet. ${where} You will be woken up in this same session when the answer arrives in conversation ${threadId}, so you can finish your turn now.`
+      : `No answer yet. ${where} Call wait_for_reply with thread_id "${threadId}" later, or check_inbox.`;
   };
 
   server.registerTool(
@@ -83,8 +85,8 @@ function buildServer(seat, run, via) {
     safely(async ({ to, message, thread_id, wait_seconds }) => {
       const sent = await store.send({ from: seat, to, text: message, threadId: thread_id, expectsReply: true, run, via });
       const replies = await store.waitForReply(seat, sent.thread_id, { seconds: wait_seconds ?? 45, interactive: !run });
-      if (replies.length) return text({ thread_id: sent.thread_id, replies });
-      return text({ thread_id: sent.thread_id, replies: [], note: await noAnswer(to, sent.thread_id) });
+      if (replies.length) return text({ thread_id: sent.thread_id, sent_at: sent.sent_at, replies });
+      return text({ thread_id: sent.thread_id, sent_at: sent.sent_at, replies: [], note: await noAnswer(sent.thread_id) });
     }),
   );
 
@@ -126,7 +128,7 @@ function buildServer(seat, run, via) {
     'wait_for_reply',
     {
       title: 'Wait for a reply',
-      description: 'Wait up to ~45 seconds for new messages to you in one conversation.',
+      description: 'Wait up to ~45 seconds for new messages to you in one conversation. If nothing arrives, it says whether the other side has picked up your message yet.',
       inputSchema: {
         thread_id: z.string(),
         wait_seconds: z.number().int().min(0).max(50).optional(),
@@ -135,7 +137,7 @@ function buildServer(seat, run, via) {
     },
     safely(async ({ thread_id, wait_seconds }) => {
       const replies = await store.waitForReply(seat, thread_id, { seconds: wait_seconds ?? 45, interactive: !run });
-      return text(replies.length ? { thread_id, replies } : { thread_id, replies: [], note: 'Nothing new yet.' });
+      return text(replies.length ? { thread_id, replies } : { thread_id, replies: [], note: await noAnswer(thread_id) });
     }),
   );
 

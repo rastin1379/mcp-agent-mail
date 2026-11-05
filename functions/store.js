@@ -13,7 +13,7 @@ export const SEATS = {
   },
   muse: {
     name: 'Muse',
-    about: "Meta's Muse agent (also called Limoo), in Meta's cloud. Has Rastin's Facebook, Instagram, Marketplace, Gmail and its own computer with a browser Rastin can log into, but not his Mac files. A fast doer of small jobs. Checks its mail every 5 minutes.",
+    about: "Meta's Muse agent (also called Limoo), in Meta's cloud. Has Rastin's Facebook, Instagram, Marketplace, Gmail and its own computer with a browser Rastin can log into, but not his Mac files. A fast doer of small jobs. Picks up mail within about 5 minutes, and a job can take 10-15 minutes more.",
   },
 };
 
@@ -56,6 +56,7 @@ function view(doc) {
     expects_reply: !!m.expects_reply,
     kind: m.kind || 'message',
     sent_at: iso(m.created_at),
+    read_at: iso(m.read_at),
   };
 }
 
@@ -103,6 +104,7 @@ export async function send({ from, to, text, threadId, expectsReply, run, via = 
   }
 
   const ref = fs().collection('messages').doc(newId('m_'));
+  const created = Timestamp.now();
   await ref.set({
     thread,
     from,
@@ -113,9 +115,9 @@ export async function send({ from, to, text, threadId, expectsReply, run, via = 
     run: run || null,
     via,
     status: 'new',
-    created_at: FieldValue.serverTimestamp(),
+    created_at: created,
   });
-  return { message_id: ref.id, thread_id: thread };
+  return { message_id: ref.id, thread_id: thread, sent_at: iso(created) };
 }
 
 async function newFor(seat, threadId) {
@@ -174,6 +176,37 @@ export async function waitForReply(seat, threadId, { seconds = 45, interactive =
   }
 }
 
+// In words: has the other side picked up the caller's latest message in this thread yet?
+// Returns { note, answered }; answered means the reply is already there (and already read).
+// A busy teammate and a stuck one look the same from "last checked", so this is what tells them apart.
+export async function progress(seat, threadId) {
+  const snap = await fs().collection('messages').where('thread', '==', threadId).get();
+  const msgs = snap.docs.map((d) => d.data()).sort((a, b) => a.created_at?.toMillis() - b.created_at?.toMillis());
+  const last = msgs.filter((m) => m.from === seat).pop();
+  if (!last) return { note: 'Nothing new yet.', answered: false };
+  const who = SEATS[last.to].name;
+  const minutes = (t) => Math.floor((Date.now() - t.toMillis()) / 60000);
+  const ago = (t) => {
+    const min = minutes(t);
+    if (min < 1) return 'less than a minute ago';
+    if (min < 120) return `${min} min ago`;
+    return min < 48 * 60 ? `${Math.floor(min / 60)} hours ago` : `${Math.floor(min / 1440)} days ago`;
+  };
+  const answer = msgs.find((m) => m.from === last.to && m.created_at?.toMillis() >= last.created_at?.toMillis());
+  if (answer) return { note: `${who} already answered at ${iso(answer.created_at)}. read_thread shows it.`, answered: true };
+  if (last.read_at) {
+    if (minutes(last.read_at) > 30) {
+      return { note: `${who} picked up your message at ${iso(last.read_at)} (${ago(last.read_at)}) but hasn't answered. It may have decided no answer was needed, so ask again in this conversation if you still need one.`, answered: false };
+    }
+    const slow = last.to === 'muse' ? ' Muse jobs can take 10-15 minutes.' : '';
+    return { note: `${who} picked up your message at ${iso(last.read_at)} (${ago(last.read_at)}) and is working on it.${slow}`, answered: false };
+  }
+  const sent = `${who} hasn't picked up your message yet (sent ${iso(last.created_at)}, ${ago(last.created_at)}).`;
+  if (last.to === 'muse') return { note: `${sent} Muse checks its mail about every 5 minutes. If it's still unread 10 minutes after you sent it, tell Rastin Muse's mail check may be stuck.`, answered: false };
+  const other = (await whoIsHere()).find((s) => s.id === last.to);
+  return { note: `${sent} ${who} is ${other.status}.`, answered: false };
+}
+
 export async function readThread(seat, threadId, { limit = 50 } = {}) {
   const t = await fs().collection('threads').doc(threadId).get();
   if (!t.exists) throw new Error(`No conversation with id ${threadId}.`);
@@ -204,7 +237,11 @@ export async function whoIsHere() {
     const checked = st.checked_at?.toMillis();
     let status;
     if (runner && now - runner < 3 * 60 * 1000) status = 'on call: answers automatically within a few minutes';
-    else if (seat === 'muse') status = checked ? `checks mail on a schedule; last checked ${iso(st.checked_at)}` : 'has not checked mail yet';
+    else if (seat === 'muse') {
+      status = checked
+        ? `checks mail about every 5 minutes; last checked ${iso(st.checked_at)}. This time doesn't move while Muse works on a job, so to see whether it has your message, look at read_at in read_thread`
+        : 'has not checked mail yet';
+    }
     else status = "offline: Rastin's Mac is off or asleep. Mail waits until it is back";
     const apps = Object.fromEntries(Object.entries(st.seen || {}).map(([label, t]) => [label, iso(t)]));
     return { id: seat, name: s.name, about: s.about, status, apps_last_seen: apps };
